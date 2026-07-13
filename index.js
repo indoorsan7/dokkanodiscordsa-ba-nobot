@@ -1,19 +1,37 @@
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField, EmbedBuilder } = require('discord.js');
+// ローカル環境でのみdotenvを読み込む
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
+
+const { 
+    Client, 
+    GatewayIntentBits, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    ChannelType, 
+    PermissionsBitField 
+} = require('discord.js');
 const http = require('http');
 
-// 1. Webサーバー設定 (Port 8000)
+// Renderのヘルスチェック用Webサーバー
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('bot is alive!');
 });
 server.listen(8000, () => console.log('Web server running on port 8000'));
 
-// 2. Discordボット設定
+// ボットのクライアント設定
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+    intents: [
+        GatewayIntentBits.Guilds, 
+        GatewayIntentBits.GuildMessages, 
+        GatewayIntentBits.MessageContent
+    ]
 });
 
-const TOKEN = 'あなたのボットトークン';
+// Renderの環境変数からトークンを取得
+const TOKEN = process.env.DISCORD_TOKEN;
 
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
@@ -30,7 +48,10 @@ client.on('messageCreate', async (message) => {
                     .setStyle(ButtonStyle.Primary)
             );
 
-        await message.channel.send({ content: '以下のボタンを押してサポートチケットを作成してください。', components: [row] });
+        await message.channel.send({ 
+            content: '以下のボタンを押してサポートチケットを作成してください。', 
+            components: [row] 
+        });
     }
 });
 
@@ -40,25 +61,26 @@ client.on('interactionCreate', async (interaction) => {
 
     if (interaction.customId === 'create_ticket') {
         const guild = interaction.guild;
-        const channelName = `ticket-${interaction.user.username}`;
-
-        // チャンネル作成と権限設定
+        // チケットチャンネルを作成
         const channel = await guild.channels.create({
-            name: channelName,
+            name: `ticket-${interaction.user.username}`,
             type: ChannelType.GuildText,
             permissionOverwrites: [
                 {
-                    id: guild.id,
+                    id: guild.id, // @everyone
                     deny: [PermissionsBitField.Flags.ViewChannel],
                 },
                 {
-                    id: interaction.user.id,
+                    id: interaction.user.id, // 作成者
                     allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
                 },
             ],
         });
 
-        await interaction.reply({ content: `チケットを作成しました: ${channel}`, ephemeral: true });
+        await interaction.reply({ 
+            content: `チケットを作成しました: ${channel}`, 
+            ephemeral: true 
+        });
     }
 });
 
