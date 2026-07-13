@@ -7,8 +7,5 @@
   },
   "dependencies": {
     "discord.js": "^14.17.3"
-  },
-  "devDependencies": {
-    "dotenv": "^16.4.5"
   }
 }
