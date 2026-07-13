@@ -5,75 +5,71 @@ const {
     ButtonBuilder, 
     ButtonStyle, 
     ChannelType, 
-    PermissionsBitField 
+    PermissionsBitField,
+    REST,
+    Routes,
+    SlashCommandBuilder
 } = require('discord.js');
 const http = require('http');
 
-// Render等の本番環境用 Webサーバー
+// Webサーバー
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('bot is alive!');
 });
 server.listen(8000, () => console.log('Web server running on port 8000'));
 
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds, 
-        GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent
-    ]
-});
-
-// 環境変数から直接トークンを取得
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const TOKEN = process.env.DISCORD_TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID; // Renderの環境変数に設定してください
 
-client.once('ready', () => {
+// コマンド登録用設定
+const commands = [
+    new SlashCommandBuilder()
+        .setName('ticket')
+        .setDescription('チケット作成用ボタンを表示します')
+].map(command => command.toJSON());
+
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+
+// コマンドの登録
+client.once('ready', async () => {
+    try {
+        await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
+        console.log('Successfully registered /ticket command.');
+    } catch (error) {
+        console.error(error);
+    }
     console.log(`Logged in as ${client.user.tag}!`);
 });
 
-// チケット作成コマンド
-client.on('messageCreate', async (message) => {
-    if (message.content === '!ticket') {
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('create_ticket')
-                    .setLabel('チケットを作成')
-                    .setStyle(ButtonStyle.Primary)
-            );
-
-        await message.channel.send({ 
-            content: '以下のボタンを押してサポートチケットを作成してください。', 
-            components: [row] 
-        });
-    }
-});
-
-// ボタン処理
+// スラッシュコマンド処理
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton()) return;
+    if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === 'ticket') {
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('create_ticket')
+                        .setLabel('チケットを作成')
+                        .setStyle(ButtonStyle.Primary)
+                );
+            await interaction.reply({ content: '以下のボタンを押してサポートチケットを作成してください。', components: [row] });
+        }
+    }
 
-    if (interaction.customId === 'create_ticket') {
+    // ボタン操作処理
+    if (interaction.isButton() && interaction.customId === 'create_ticket') {
         const guild = interaction.guild;
         const channel = await guild.channels.create({
             name: `ticket-${interaction.user.username}`,
             type: ChannelType.GuildText,
             permissionOverwrites: [
-                {
-                    id: guild.id,
-                    deny: [PermissionsBitField.Flags.ViewChannel],
-                },
-                {
-                    id: interaction.user.id,
-                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
-                },
+                { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
             ],
         });
-
-        await interaction.reply({ 
-            content: `チケットを作成しました: ${channel}`, 
-            ephemeral: true 
-        });
+        await interaction.reply({ content: `チケットを作成しました: ${channel}`, ephemeral: true });
     }
 });
 
