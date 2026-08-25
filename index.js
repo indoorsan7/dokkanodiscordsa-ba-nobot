@@ -9,7 +9,7 @@ const {
     REST,
     Routes,
     SlashCommandBuilder,
-    EmbedBuilder // Embed用に追加
+    EmbedBuilder
 } = require('discord.js');
 const http = require('http');
 
@@ -33,11 +33,21 @@ const client = new Client({
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 
-// コマンド登録用設定
+// コマンド登録用設定（タイトルと説明を必須オプションとして定義）
 const commands = [
     new SlashCommandBuilder()
         .setName('ticket')
-        .setDescription('チケット作成用Embedを表示します')
+        .setDescription('チケット作成用のEmbedを表示します')
+        .addStringOption(option =>
+            option.setName('title')
+                .setDescription('Embedのタイトル')
+                .setRequired(true) // 絶対（必須）
+        )
+        .addStringOption(option =>
+            option.setName('description')
+                .setDescription('Embedの説明文')
+                .setRequired(true) // 絶対（必須）
+        )
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -57,13 +67,12 @@ client.once('ready', async () => {
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'ticket') {
+            // 入力されたタイトルと説明を取得
+            const embedTitle = interaction.options.getString('title');
+            const embedDescription = interaction.options.getString('description');
             
-            // ==========================================
-            // 📝 ここで Embed の内容を自由に変更できます
-            // ==========================================
-            const embedTitle = 'サポートチケット'; // ← タイトル（絶対）
-            const embedDescription = '以下のボタンを押してサポートチケットを作成してください。スタッフが対応いたします。'; // ← 説明（絶対）
-            const embedColor = '#3498db'; // ← カラー（自由：カラーコードやBlueなどの指定が可能）
+            // Embedの色（ここは自由に変更できます。デフォルトは青色）
+            const embedColor = '#3498db'; 
 
             const ticketEmbed = new EmbedBuilder()
                 .setTitle(embedTitle)
