@@ -8,7 +8,8 @@ const {
     PermissionsBitField,
     REST,
     Routes,
-    SlashCommandBuilder
+    SlashCommandBuilder,
+    EmbedBuilder // Embed用に追加
 } = require('discord.js');
 const http = require('http');
 
@@ -25,18 +26,18 @@ const messageHistory = new Map();
 const client = new Client({ 
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages, // メッセージの監視に必要
-        GatewayIntentBits.MessageContent   // メッセージの内容取得に必要
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
     ] 
 });
 const TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID; // Renderの環境変数に設定してください
+const CLIENT_ID = process.env.CLIENT_ID;
 
 // コマンド登録用設定
 const commands = [
     new SlashCommandBuilder()
         .setName('ticket')
-        .setDescription('チケット作成用ボタンを表示します')
+        .setDescription('チケット作成用Embedを表示します')
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -56,6 +57,19 @@ client.once('ready', async () => {
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'ticket') {
+            
+            // ==========================================
+            // 📝 ここで Embed の内容を自由に変更できます
+            // ==========================================
+            const embedTitle = 'サポートチケット'; // ← タイトル（絶対）
+            const embedDescription = '以下のボタンを押してサポートチケットを作成してください。スタッフが対応いたします。'; // ← 説明（絶対）
+            const embedColor = '#3498db'; // ← カラー（自由：カラーコードやBlueなどの指定が可能）
+
+            const ticketEmbed = new EmbedBuilder()
+                .setTitle(embedTitle)
+                .setDescription(embedDescription)
+                .setColor(embedColor);
+
             const row = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
@@ -63,7 +77,8 @@ client.on('interactionCreate', async (interaction) => {
                         .setLabel('チケットを作成')
                         .setStyle(ButtonStyle.Primary)
                 );
-            await interaction.reply({ content: '以下のボタンを押してサポートチケットを作成してください。', components: [row] });
+            
+            await interaction.reply({ embeds: [ticketEmbed], components: [row] });
         }
     }
 
@@ -84,7 +99,6 @@ client.on('interactionCreate', async (interaction) => {
 
 // スパム検知（同じメッセージが1分以内に5回投稿されたら5分タイムアウト）
 client.on('messageCreate', async (message) => {
-    // BotのメッセージやDMは無視
     if (message.author.bot || !message.guild) return;
 
     const userId = message.author.id;
@@ -97,28 +111,19 @@ client.on('messageCreate', async (message) => {
 
     const userHistory = messageHistory.get(userId);
 
-    // 1分以内（60,000ミリ秒）の履歴のみ保持し、かつ同じ内容のメッセージを抽出
     const recentMessages = userHistory.filter(item => 
         now - item.timestamp < 60000 && item.content === content
     );
 
-    // 今回のメッセージを追加
     recentMessages.push({ content, timestamp: now });
     
-    // 履歴を更新（最新のものを保存）
     messageHistory.set(userId, [...userHistory.filter(item => now - item.timestamp < 60000), { content, timestamp: now }]);
 
-    // 同じメッセージが5回に達した場合
     if (recentMessages.length >= 5) {
         try {
             const member = await message.guild.members.fetch(userId);
-            
-            // 5分間（5 * 60 * 1000ミリ秒）のタイムアウトを適用
             await member.timeout(5 * 60 * 1000, '同じメッセージの連続投稿（スパム）のため');
-            
             await message.channel.send(`${message.author} さん、同じメッセージが連続して投稿されたため、5分間のタイムアウト処分となりました。`);
-            
-            // 処理後に履歴をクリア
             messageHistory.delete(userId);
         } catch (error) {
             console.error('タイムアウトの適用に失敗しました:', error);
